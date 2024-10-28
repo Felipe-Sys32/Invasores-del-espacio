@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invasores del espacio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-color: #000;
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .menu-container {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            padding: 2rem;
+            border: 4px solid rgb(0, 144, 0);
+            box-shadow: 0 0 20px rgb(1, 63, 1);
+            background-color: rgba(0, 0, 0, 0.8);
+            animation: borderPulse 2s infinite;
+        }
+
+        h1 {
+            color: #0f0;
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 10px #0f0;
+            animation: titleGlow 1.5s infinite;
+        }
+
+        .menu-button {
+            display: block;
+            width: 250px;
+            padding: 1rem;
+            margin: 1.5rem auto;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            background-color: transparent;
+            color: #0f0;
+            border: 2px solid #0f0;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            text-shadow: 0 0 5px #0f0;
+            position: relative;
+        }
+
+        .menu-button:hover {
+            background-color: #0f0;
+            color: #000;
+            transform: scale(1.1);
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        .menu-button::before {
+            content: '>';
+            position: absolute;
+            left: 20px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .menu-button:hover::before {
+            opacity: 1;
+        }
+
+        @keyframes borderPulse {
+            0% { box-shadow: 0 0 15px #0f0; }
+            50% { box-shadow: 0 0 30px #0f0; }
+            100% { box-shadow: 0 0 15px #0f0; }
+        }
+
+        @keyframes titleGlow {
+            0% { text-shadow: 0 0 10px #0f0; }
+            50% { text-shadow: 0 0 20px #0f0, 0 0 30px #0f0; }
+            100% { text-shadow: 0 0 10px #0f0; }
+        }
+
+        .high-score {
+            color: #0f0;
+            font-size: 0.8rem;
+            margin-top: 2rem;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        .version {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #0f0;
+            font-size: 0.6rem;
+            opacity: 0.5;
+        }
+
+        #opciones, #creditos {
+            display: none;
+        }
+
+        .opcion {
+            margin: 1.5rem 0;
+            color: #0f0;
+        }
+
+        .opcion label {
+            display: block;
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+        }
+
+        .opcion input[type="range"] {
+            -webkit-appearance: none;
+            width: 200px;
+            height: 10px;
+            background: #000;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+        }
+
+        .opcion input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #0f0;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .opcion select {
+            background: #000;
+            color: #0f0;
+            border: 2px solid #0f0;
+            padding: 0.5rem;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.8rem;
+            width: 200px;
+            text-align: center;
+        }
+
+        @keyframes scanline {
+            0% {
+                transform: translateY(-100%);
+            }
+            100% {
+                transform: translateY(100%);
+            }
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100px;
+            background: linear-gradient(
+                to bottom,
+                transparent,
+                rgba(0, 255, 0, 0.1),
+                transparent
+            );
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="stars"></div>
+    <div class="scanline"></div>
+
+    <div class="menu-container">
+        <h1>Invasores del espacio!</h1>
+        
+        <div id="menu-principal">
+            <button class="menu-button" onclick="iniciarJuego()">JUGAR</button>
+            <button class="menu-button" onclick="mostrarOpciones()">OPCIONES</button>
+            <button class="menu-button" onclick="mostrarCreditos()">CRÉDITOS</button>
+            <button class="menu-button" onclick="salir()">SALIR</button>
+            
+            <div class="high-score">
+                HIGH SCORE: <span id="high-score">00000</span>
+            </div>
+        </div>
+
+        <div id="opciones">
+            <h2>OPCIONES</h2>
+            <div class="opcion">
+                <label>VOLUMEN</label>
+                <input type="range" min="0" max="100" value="50" id="volumen">
+            </div>
+            <div class="opcion">
+                <label>DIFICULTAD</label>
+                <select id="dificultad">
+                    <option value="facil">FÁCIL</option>
+                    <option value="medio">MEDIO</option>
+                    <option value="dificil">DIFÍCIL</option>
+                </select>
+            </div>
+            <button class="menu-button" onclick="volverAlMenu()">VOLVER</button>
+        </div>
+
+        <div id="creditos">
+            <h2>CRÉDITOS</h2>
+            <p style="color: #0f0; font-size: 0.8rem; line-height: 1.5;">
+                DESARROLLADO POR<br>
+                FELIPE (AKA,SENIOR SALCHIPAPA)<br><br>
+                VERSIÓN 1.0<br>
+                2024
+            </p>
+            <button class="menu-button" onclick="volverAlMenu()">VOLVER</button>
+        </div>
+    </div>
+
+    <div class="version">V1.0</div>
+
+    <script>
+        // Crear efecto de estrellas
+        function crearEstrellas() {
+            const starsContainer = document.querySelector('.stars');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.style.position = 'absolute';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.width = '2px';
+                star.style.height = '2px';
+                star.style.backgroundColor = '#fff';
+                star.style.opacity = Math.random();
+                starsContainer.appendChild(star);
+            }
+        }
+
+        function iniciarJuego() {
+            window.location.href = 'juego.html';
+        }
+
+        function mostrarOpciones() {
+            document.getElementById('menu-principal').style.display = 'none';
+            document.getElementById('opciones').style.display = 'block';
+        }
+
+        function mostrarCreditos() {
+            document.getElementById('menu-principal').style.display = 'none';
+            document.getElementById('creditos').style.display = 'block';
+        }
+
+        function volverAlMenu() {
+            document.getElementById('opciones').style.display = 'none';
+            document.getElementById('creditos').style.display = 'none';
+            document.getElementById('menu-principal').style.display = 'block';
+        }
+
+        function salir() {
+            const confirmarSalida = confirm('¿ESTÁS SEGURO QUE DESEAS SALIR?');
+            if (confirmarSalida) {
+                window.close();
+                window.location.href = 'https://www.google.com';
+            }
+        }
+
+        // Inicializar estrellas al cargar
+        window.onload = function() {
+            crearEstrellas();
+            
+            // Cargar high score guardado
+            const highScore = localStorage.getItem('highScore') || '00000';
+            document.getElementById('high-score').textContent = highScore;
+            
+            // Cargar opciones guardadas
+            const volumenGuardado = localStorage.getItem('volumen');
+            const dificultadGuardada = localStorage.getItem('dificultad');
+            
+            if (volumenGuardado) {
+                document.getElementById('volumen').value = volumenGuardado;
+            }
+            if (dificultadGuardada) {
+                document.getElementById('dificultad').value = dificultadGuardada;
+            }
+        }
+    </script>
+</body>
+</html>
+
+

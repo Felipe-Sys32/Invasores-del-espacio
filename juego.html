@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Space Invaders</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: black;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        canvas {
+            border: 2px solid white;
+        }
+        #puntuacion {
+            color: white;
+            font-size: 24px;
+            font-family: Arial, sans-serif;
+            margin: 10px;
+        }
+        #volver {
+            margin: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    
+        #puntuacion {
+            font-family: 'Press Start 2P', cursive;
+            color: #0f0;
+            text-shadow: 0 0 5px #0f0;
+        }
+    
+        canvas {
+            box-shadow: 0 0 20px #0f0;
+        }
+    
+        #volver {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #000;
+            border: 2px solid #0f0;
+            color: #0f0;
+            text-shadow: 0 0 5px #0f0;
+            box-shadow: 0 0 10px #0f0;
+            transition: all 0.3s;
+        }
+    
+        #volver:hover {
+            background-color: #0f0;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="puntuacion">Puntuación: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <button id="volver" onclick="window.location.href='juegoLobby.html'">Volver al Menú</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // Jugador
+        const jugador = {
+            x: canvas.width / 2,
+            y: canvas.height - 30,
+            width: 50,
+            height: 30,
+            velocidad: 5
+        };
+
+        // Proyectiles
+        let proyectiles = [];
+        const velocidadProyectil = 7;
+
+        // Invasores
+        let invasores = [];
+        const invasoresPorFila = 8;
+        const filasInvasores = 4;
+        const invasorWidth = 40;
+        const invasorHeight = 30;
+        const espaciadoInvasores = 15;
+
+        // Variables del juego
+        let score = 0;
+        let juegoActivo = true;
+        let teclasDireccion = {
+            izquierda: false,
+            derecha: false
+        };
+
+        // Nuevo objeto para explosiones
+        let explosiones = [];
+        const framesExplosion = 8; // Número de frames en la animación
+
+        // Añadir estas variables globales al inicio
+        let dificultad = localStorage.getItem('dificultad') || 'facil';
+        let proyectilesEnemigos = [];
+        let velocidadBase;
+        let tamañoEnemigo;
+
+        // Configurar dificultad según el nivel seleccionado
+        function configurarDificultad() {
+            switch(dificultad) {
+                case 'facil':
+                    velocidadBase = 1;
+                    tamañoEnemigo = {width: 40, height: 30};
+                    break;
+                case 'medio':
+                    velocidadBase = 1.5;
+                    tamañoEnemigo = {width: 45, height: 35};
+                    break;
+                case 'dificil':
+                    velocidadBase = 2;
+                    tamañoEnemigo = {width: 50, height: 40};
+                    break;
+            }
+        }
+
+        // Modificar la función inicializarInvasores
+        function inicializarInvasores() {
+            configurarDificultad();
+            const velocidadProgresiva = velocidadBase + Math.floor(score / 1000) * 0.2;
+            
+            for (let fila = 0; fila < filasInvasores; fila++) {
+                for (let col = 0; col < invasoresPorFila; col++) {
+                    invasores.push({
+                        x: col * (tamañoEnemigo.width + espaciadoInvasores) + 50,
+                        y: fila * (tamañoEnemigo.height + espaciadoInvasores) + 50,
+                        width: tamañoEnemigo.width,
+                        height: tamañoEnemigo.height,
+                        direccion: 1,
+                        velocidad: velocidadProgresiva,
+                        ultimoDisparo: 0
+                    });
+                }
+            }
+        }
+
+        // Nueva clase para manejar explosiones
+        class Explosion {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.frame = 0;
+                this.frameCount = framesExplosion;
+                this.size = 40;
+                this.completada = false;
+                this.particulas = [];
+                
+                // Crear partículas
+                for (let i = 0; i < 12; i++) {
+                    this.particulas.push({
+                        x: this.x,
+                        y: this.y,
+                        velocidad: Math.random() * 4 + 2,
+                        angulo: (Math.PI * 2 * i) / 12,
+                        tamaño: Math.random() * 3 + 2
+                    });
+                }
+            }
+
+            actualizar() {
+                this.frame++;
+                if (this.frame >= this.frameCount) {
+                    this.completada = true;
+                }
+
+                // Actualizar partículas
+                this.particulas.forEach(particula => {
+                    particula.x += Math.cos(particula.angulo) * particula.velocidad;
+                    particula.y += Math.sin(particula.angulo) * particula.velocidad;
+                });
+            }
+
+            dibujar(ctx) {
+                const alpha = 1 - (this.frame / this.frameCount);
+                
+                // Destello central
+                const gradiente = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.size
+                );
+                gradiente.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+                gradiente.addColorStop(0.4, `rgba(255, 165, 0, ${alpha * 0.5})`);
+                gradiente.addColorStop(1, `rgba(255, 0, 0, 0)`);
+
+                ctx.fillStyle = gradiente;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Dibujar partículas
+                this.particulas.forEach(particula => {
+                    ctx.fillStyle = `rgba(255, ${165 * alpha}, 0, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(particula.x, particula.y, particula.tamaño, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+        }
+
+        // Control del jugador
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') teclasDireccion.izquierda = true;
+            if (e.key === 'ArrowRight') teclasDireccion.derecha = true;
+            if (e.key === ' ') disparar();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') teclasDireccion.izquierda = false;
+            if (e.key === 'ArrowRight') teclasDireccion.derecha = false;
+        });
+
+        function disparar() {
+            proyectiles.push({
+                x: jugador.x + jugador.width / 2,
+                y: jugador.y,
+                width: 3,
+                height: 15
+            });
+        }
+
+        function actualizarJugador() {
+            if (teclasDireccion.izquierda && jugador.x > 0) {
+                jugador.x -= jugador.velocidad;
+            }
+            if (teclasDireccion.derecha && jugador.x < canvas.width - jugador.width) {
+                jugador.x += jugador.velocidad;
+            }
+        }
+
+        function actualizarProyectiles() {
+            for (let i = proyectiles.length - 1; i >= 0; i--) {
+                proyectiles[i].y -= velocidadProyectil;
+                if (proyectiles[i].y < 0) {
+                    proyectiles.splice(i, 1);
+                }
+            }
+        }
+
+        function actualizarInvasores() {
+            let tocarBorde = false;
+
+            invasores.forEach(invasor => {
+                invasor.x += invasor.velocidad * invasor.direccion;
+                
+                if (invasor.x <= 0 || invasor.x + invasor.width >= canvas.width) {
+                    tocarBorde = true;
+                }
+            });
+
+            if (tocarBorde) {
+                invasores.forEach(invasor => {
+                    invasor.direccion *= -1;
+                    invasor.y += 20;
+                });
+            }
+        }
+
+        // Modificar la función detectarColisiones
+        function detectarColisiones() {
+            for (let i = proyectiles.length - 1; i >= 0; i--) {
+                for (let j = invasores.length - 1; j >= 0; j--) {
+                    if (colision(proyectiles[i], invasores[j])) {
+                        // Crear explosión
+                        explosiones.push(new Explosion(
+                            invasores[j].x + invasores[j].width/2,
+                            invasores[j].y + invasores[j].height/2
+                        ));
+                        
+                        proyectiles.splice(i, 1);
+                        invasores.splice(j, 1);
+                        score += 100;
+                        scoreElement.textContent = score;
+                        
+                        // Si no quedan invasores, crear nueva oleada
+                        if (invasores.length === 0) {
+                            inicializarInvasores();
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        function colision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        // Añadir función para disparos enemigos
+        function disparoEnemigo() {
+            invasores.forEach(invasor => {
+                if (dificultad === 'facil' && Math.random() < 0.001 ||
+                    dificultad === 'medio' && Math.random() < 0.002 ||
+                    dificultad === 'dificil' && Math.random() < 0.004) {
+                    
+                    const tiempoActual = Date.now();
+                    if (tiempoActual - invasor.ultimoDisparo > 1000) { // Cooldown de 1 segundo
+                        proyectilesEnemigos.push({
+                            x: invasor.x + invasor.width / 2,
+                            y: invasor.y + invasor.height,
+                            width: 3,
+                            height: 10,
+                            velocidad: dificultad === 'dificil' ? 7 : 5
+                        });
+                        invasor.ultimoDisparo = tiempoActual;
+                    }
+                }
+            });
+        }
+
+        // Añadir función para actualizar proyectiles enemigos
+        function actualizarProyectilesEnemigos() {
+            for (let i = proyectilesEnemigos.length - 1; i >= 0; i--) {
+                proyectilesEnemigos[i].y += proyectilesEnemigos[i].velocidad;
+                
+                // Verificar colisión con jugador
+                if (colision(proyectilesEnemigos[i], jugador)) {
+                    gameOver();
+                    return;
+                }
+                
+                // Eliminar proyectiles fuera de pantalla
+                if (proyectilesEnemigos[i].y > canvas.height) {
+                    proyectilesEnemigos.splice(i, 1);
+                }
+            }
+        }
+
+        // Añadir función de Game Over
+        function gameOver() {
+            juegoActivo = false;
+            
+            // Actualizar high score si es necesario
+            const highScore = localStorage.getItem('highScore') || 0;
+            if (score > highScore) {
+                localStorage.setItem('highScore', score);
+            }
+            
+            // Mostrar mensaje de game over
+            ctx.fillStyle = 'red';
+            ctx.font = '48px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2);
+            ctx.font = '24px "Press Start 2P"';
+            ctx.fillText(`Score: ${score}`, canvas.width/2, canvas.height/2 + 50);
+            ctx.fillText('Presiona ESPACIO para reiniciar', canvas.width/2, canvas.height/2 + 100);
+            
+            // Escuchar tecla espacio para reiniciar
+            document.addEventListener('keydown', reiniciarJuego);
+        }
+
+        // Añadir función de reinicio
+        function reiniciarJuego(e) {
+            if (e.key === ' ' && !juegoActivo) {
+                document.removeEventListener('keydown', reiniciarJuego);
+                score = 0;
+                invasores = [];
+                proyectiles = [];
+                proyectilesEnemigos = [];
+                jugador.x = canvas.width / 2;
+                inicializarInvasores();
+                juegoActivo = true;
+                gameLoop();
+            }
+        }
+
+        // Modificar la función dibujar para incluir proyectiles enemigos
+        function dibujar() {
+            // Limpiar canvas y dibujar fondo
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Efecto de estrellas
+            ctx.fillStyle = 'white';
+            for (let i = 0; i < 100; i++) {
+                const x = Math.random() * canvas.width;
+                const y = (Math.random() * canvas.height + performance.now()/50) % canvas.height;
+                ctx.fillRect(x, y, 1, 1);
+            }
+
+            // Dibujar jugador (nave triangular)
+            ctx.fillStyle = '#00ff00';
+            ctx.beginPath();
+            ctx.moveTo(jugador.x + jugador.width/2, jugador.y);
+            ctx.lineTo(jugador.x + jugador.width, jugador.y + jugador.height);
+            ctx.lineTo(jugador.x, jugador.y + jugador.height);
+            ctx.closePath();
+            ctx.fill();
+
+            // Dibujar proyectiles con efecto
+            ctx.fillStyle = '#fff';
+            proyectiles.forEach(proyectil => {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(proyectil.x, proyectil.y, proyectil.width, proyectil.height);
+                
+                // Efecto de brillo
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.fillRect(proyectil.x - 1, proyectil.y, proyectil.width + 2, proyectil.height);
+            });
+
+            // Dibujar invasores (naves alienígenas)
+            const pulso = Math.sin(performance.now() / 200) * 0.2 + 0.8;
+            invasores.forEach(invasor => {
+                // Color base con efecto pulsante
+                ctx.fillStyle = `rgb(255, ${Math.floor(50 * pulso)}, ${Math.floor(50 * pulso)})`;
+                
+                // Cuerpo principal de la nave
+                ctx.beginPath();
+                ctx.moveTo(invasor.x + invasor.width/2, invasor.y); // Punta superior
+                ctx.lineTo(invasor.x + invasor.width, invasor.y + invasor.height * 0.4); // Esquina superior derecha
+                ctx.lineTo(invasor.x + invasor.width * 0.8, invasor.y + invasor.height * 0.6); // Entrada derecha
+                ctx.lineTo(invasor.x + invasor.width, invasor.y + invasor.height); // Esquina inferior derecha
+                ctx.lineTo(invasor.x, invasor.y + invasor.height); // Esquina inferior izquierda
+                ctx.lineTo(invasor.x + invasor.width * 0.2, invasor.y + invasor.height * 0.6); // Entrada izquierda
+                ctx.lineTo(invasor.x, invasor.y + invasor.height * 0.4); // Esquina superior izquierda
+                ctx.closePath();
+                ctx.fill();
+
+                // Cabina de la nave
+                ctx.fillStyle = `rgba(150, 220, 255, ${pulso})`;
+                ctx.beginPath();
+                ctx.ellipse(
+                    invasor.x + invasor.width/2,
+                    invasor.y + invasor.height * 0.4,
+                    invasor.width * 0.2,
+                    invasor.height * 0.2,
+                    0,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+
+                // Luces de la nave
+                const lucesColor = `rgba(255, 255, 0, ${pulso})`;
+                ctx.fillStyle = lucesColor;
+                
+                // Luz izquierda
+                ctx.beginPath();
+                ctx.arc(
+                    invasor.x + invasor.width * 0.2,
+                    invasor.y + invasor.height * 0.8,
+                    3,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+
+                // Luz derecha
+                ctx.beginPath();
+                ctx.arc(
+                    invasor.x + invasor.width * 0.8,
+                    invasor.y + invasor.height * 0.8,
+                    3,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+
+                // Efecto de brillo alrededor de la nave
+                ctx.strokeStyle = `rgba(255, 0, 0, ${pulso * 0.3})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Dibujar explosiones
+            explosiones = explosiones.filter(explosion => !explosion.completada);
+            explosiones.forEach(explosion => {
+                explosion.actualizar();
+                explosion.dibujar(ctx);
+            });
+
+            // Dibujar proyectiles enemigos
+            ctx.fillStyle = '#ff0000';
+            proyectilesEnemigos.forEach(proyectil => {
+                ctx.beginPath();
+                ctx.moveTo(proyectil.x, proyectil.y);
+                ctx.lineTo(proyectil.x - proyectil.width, proyectil.y + proyectil.height);
+                ctx.lineTo(proyectil.x + proyectil.width, proyectil.y + proyectil.height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Efecto de brillo
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Puntuación
+            ctx.fillStyle = '#0f0';
+            ctx.font = '20px "Press Start 2P", monospace';
+            ctx.fillText(`SCORE: ${score}`, 10, 30);
+        }
+
+        // Modificar el gameLoop para incluir las nuevas funciones
+        function gameLoop() {
+            if (!juegoActivo) return;
+
+            actualizarJugador();
+            actualizarProyectiles();
+            actualizarInvasores();
+            disparoEnemigo();
+            actualizarProyectilesEnemigos();
+            detectarColisiones();
+            dibujar();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Iniciar juego
+        inicializarInvasores();
+        gameLoop();
+    </script>
+</body>
+</html>
